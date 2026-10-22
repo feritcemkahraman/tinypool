@@ -230,6 +230,39 @@ test('tasks can share a Worker if requested (both tests finish)', async () => {
   expect(pool.queueSize).toBe(0)
 })
 
+test('worker drains queued tasks concurrently up to concurrentTasksPerWorker', async () => {
+  const pool = new Tinypool({
+    filename: resolve(__dirname, 'fixtures/wait-for-notify.js'),
+    minThreads: 0,
+    maxThreads: 1,
+    concurrentTasksPerWorker: 2,
+  })
+
+  const buffers = [
+    new Int32Array(new SharedArrayBuffer(4)),
+    new Int32Array(new SharedArrayBuffer(4)),
+  ] as const
+
+  const firstTask = pool.run(buffers[0])
+  const secondTask = pool.run(buffers[1])
+
+  while (pool.threads.length === 0) {
+    await new Promise((resolve) => setTimeout(resolve, 10))
+  }
+
+  await new Promise((resolve) => setTimeout(resolve, 50))
+
+  expect(pool.queueSize).toBe(0)
+
+  Atomics.store(buffers[0] as any, 0, 1)
+  Atomics.store(buffers[1] as any, 0, 1)
+  Atomics.notify(buffers[0] as any, 0, 1)
+  Atomics.notify(buffers[1] as any, 0, 1)
+
+  await Promise.all([firstTask, secondTask])
+  await pool.destroy()
+})
+
 test('custom task queue works', async () => {
   let sizeCalled: boolean = false
   let shiftCalled: boolean = false

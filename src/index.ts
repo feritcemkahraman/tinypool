@@ -910,7 +910,6 @@ class ThreadPool {
       taskInfo.started = now
       workerInfo.postTask(taskInfo)
       this._maybeDrain()
-      return
     }
 
     if (
